@@ -3,7 +3,7 @@ name = "crawl-rs"
 version = "0.0.1"
 authors = ["o0Ignition0o <jeremy.lempereur@gmail.com>"]
 description = "Crawl-rs allows you to generate async Http requests, and scrape the results directly into a custom datastructure."
-license = "MIT"
+license = "MPL-2.0"
 
 repository = "https://github.com/o0Ignition0o/crawl-rs"
 documentation = "https://docs.rs/crawl-rs/"
