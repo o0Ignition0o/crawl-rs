@@ -9,3 +9,7 @@ repository = "https://github.com/o0Ignition0o/crawl-rs"
 documentation = "https://docs.rs/crawl-rs/"
 
 [dependencies]
+futures = "*"
+hyper = "*"
+tokio-core = "*"
+serde_json = "*"
