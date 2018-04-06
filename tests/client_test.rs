@@ -1,9 +1,13 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 extern crate crawl_rs;
 extern crate hyper;
 extern crate serde_json;
 
 use hyper::StatusCode;
-use crawl_rs::http::client::{get_json, get_string, CrawlResponse};
+use crawl_rs::providers::http::{get_json, get_string};
+use crawl_rs::providers::crawl::CrawlResponse;
 
 #[test]
 fn get_json_with_valid_url() {

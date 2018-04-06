@@ -5,4 +5,5 @@ extern crate futures;
 extern crate hyper;
 extern crate serde_json;
 extern crate tokio_core;
-pub mod http;
+
+pub mod providers;

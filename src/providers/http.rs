@@ -1,13 +1,12 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-use hyper::error::UriError;
-use std::string::FromUtf8Error;
+
+use providers::crawl::{CrawlError, CrawlResponse};
 use hyper::Response;
 use hyper::Uri;
 use hyper::client::HttpConnector;
 use serde_json::Value;
-use hyper::StatusCode;
 use hyper::Error;
 use hyper::Client;
 use tokio_core::reactor::Core;
@@ -15,20 +14,6 @@ use futures::Future;
 use futures::future::ok;
 use futures::Stream;
 use serde_json;
-
-#[derive(Debug)]
-pub struct CrawlResponse<T> {
-    pub body: T,
-    pub status: StatusCode,
-}
-
-#[derive(Debug)]
-pub enum CrawlError {
-    UriError(UriError),
-    HttpError(Error),
-    StringParseError(FromUtf8Error),
-    JsonParseError(serde_json::Error),
-}
 
 pub fn get_json(uri: String) -> Result<CrawlResponse<Value>, CrawlError> {
     let mut core = Core::new().unwrap();
@@ -64,7 +49,8 @@ fn into_json_response(
         .body()
         .concat2()
         .and_then(move |body| {
-            let content: Value = serde_json::from_slice(&body).unwrap();
+            let content: Value =
+                serde_json::from_slice(&body).unwrap_or(serde_json::from_str(r#"{}"#).unwrap());
             ok(CrawlResponse {
                 body: content,
                 status: status,
@@ -81,7 +67,7 @@ fn into_string_response(
         .body()
         .concat2()
         .and_then(move |body| {
-            let content: String = String::from_utf8(body.to_vec()).unwrap();
+            let content: String = String::from_utf8(body.to_vec()).unwrap_or(String::new());
             ok(CrawlResponse {
                 body: content,
                 status: status,
@@ -93,7 +79,7 @@ fn into_string_response(
 #[cfg(test)]
 mod client_tests {
     use hyper::StatusCode;
-    use http::client::{get_json, get_string, CrawlResponse};
+    use providers::http::{get_json, get_string, CrawlResponse};
 
     #[test]
     fn get_json_with_valid_url() {
