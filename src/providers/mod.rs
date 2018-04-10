@@ -4,3 +4,4 @@
 
 pub mod crawl;
 pub mod http;
+pub mod file;

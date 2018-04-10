@@ -2,67 +2,44 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use providers::crawl::{CrawlError, CrawlResponse};
+use providers::crawl::{CrawlError, CrawlResponse, ResponseStatus};
 use hyper::Response;
-use hyper::Uri;
 use hyper::client::HttpConnector;
-use serde_json::Value;
-use hyper::Error;
 use hyper::Client;
 use tokio_core::reactor::Core;
 use futures::Future;
 use futures::future::ok;
 use futures::Stream;
-use serde_json;
+use hyper_tls::HttpsConnector;
 
-pub fn get_json(uri: String) -> Result<CrawlResponse<Value>, CrawlError> {
+pub fn crawl(uri: &str) -> Result<CrawlResponse, CrawlError> {
     let mut core = Core::new().unwrap();
-    let client = Client::new(&core.handle());
+    let handle = core.handle();
+    let client = Client::configure()
+        .connector(HttpsConnector::new(4, &handle).unwrap())
+        .build(&handle);
+    core.run(async_crawl(uri, client))
+}
+
+pub fn async_crawl(
+    uri: &str,
+    http_client: Client<HttpsConnector<HttpConnector>>,
+) -> impl Future<Item = CrawlResponse, Error = CrawlError> {
     let uri = uri.parse()
-        .or_else(|error| Err(CrawlError::UriError(error)))?;
-    let work = get(uri, &client)
+        .map_err(|error| CrawlError::UriError(error))
+        .unwrap();
+    http_client
+        .get(uri)
         .map_err(|error| CrawlError::HttpError(error))
-        .and_then(|response| into_json_response(response));
-    core.run(work)
+        .and_then(|response| into_string(response))
 }
 
-pub fn get_string(uri: String) -> Result<CrawlResponse<String>, CrawlError> {
-    let mut core = Core::new().unwrap();
-    let client = Client::new(&core.handle());
-    let uri = uri.parse()
-        .or_else(|error| Err(CrawlError::UriError(error)))?;
-    let work = get(uri, &client)
-        .map_err(|error| CrawlError::HttpError(error))
-        .and_then(|response| into_string_response(response));
-    core.run(work)
-}
-
-fn get(uri: Uri, client: &Client<HttpConnector>) -> impl Future<Item = Response, Error = Error> {
-    client.get(uri)
-}
-
-fn into_json_response(
-    response: Response,
-) -> impl Future<Item = CrawlResponse<Value>, Error = CrawlError> {
-    let status = response.status();
-    response
-        .body()
-        .concat2()
-        .and_then(move |body| {
-            let content: Value =
-                serde_json::from_slice(&body).unwrap_or(serde_json::from_str(r#"{}"#).unwrap());
-            ok(CrawlResponse {
-                body: content,
-                status: status,
-            })
-        })
-        .map_err(|error| CrawlError::HttpError(error))
-}
-
-fn into_string_response(
-    response: Response,
-) -> impl Future<Item = CrawlResponse<String>, Error = CrawlError> {
-    let status = response.status();
+fn into_string(response: Response) -> impl Future<Item = CrawlResponse, Error = CrawlError> {
+    let status = if response.status().is_success() {
+        ResponseStatus::HttpSuccess(response.status())
+    } else {
+        ResponseStatus::HttpError(response.status())
+    };
     response
         .body()
         .concat2()
@@ -74,37 +51,4 @@ fn into_string_response(
             })
         })
         .map_err(|error| CrawlError::HttpError(error))
-}
-
-#[cfg(test)]
-mod client_tests {
-    use hyper::StatusCode;
-    use providers::http::{get_json, get_string, CrawlResponse};
-
-    #[test]
-    fn get_json_with_valid_url() {
-        let uri = "http://httpbin.org/ip".to_string();
-        let CrawlResponse { body, status } = get_json(uri).unwrap();
-
-        assert_eq!(
-            StatusCode::Ok,
-            status,
-            "JSON status is supposed to be StatusCode::Ok, got : {} \n {:?} \n",
-            status,
-            body
-        );
-    }
-
-    #[test]
-    fn get_string_with_valid_url() {
-        let uri = "http://httpbin.org/ip".to_string();
-        let CrawlResponse { body, status } = get_string(uri).unwrap();
-        assert_eq!(
-            StatusCode::Ok,
-            status,
-            "JSON status is supposed to be StatusCode::Ok, got : {} \n {:?} \n",
-            status,
-            body
-        );
-    }
 }
